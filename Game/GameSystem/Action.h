@@ -2,7 +2,6 @@
 #include "Attack.h"
 
 
-
 class Action
 {
     public:

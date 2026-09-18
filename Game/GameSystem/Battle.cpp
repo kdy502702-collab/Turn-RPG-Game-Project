@@ -45,30 +45,39 @@ void Battle::FlowCount(const std::vector<Unit*> units){
                     }
                 }
             }
-            if(inputActionCode==1){
-                while(true){
-                for(Unit* unit:units){
-                    if(typeid(unit)==typeid(Player)){
-                        continue;
-                    }
-                    std::cout<<"타겟 : "<<unit->GetName()<<" HP : "<<unit->GetCurHp()<<"\n <y/n> : ";
+            if (inputActionCode == 1) {
+                bool targetSelected = false;
+
+                // 플레이어가 아닌 적 유닛 순회
+                for (Unit* targetCandidate : units) {
+                    if (dynamic_cast<Player*>(targetCandidate) != nullptr) continue; // 플레이어 자신 제외
+                    if (targetCandidate->GetIsDead()) continue; // 이미 죽은 적 제외
+                
+                    std::cout << "타겟 : " << targetCandidate->GetName() 
+                              << " (HP: " << targetCandidate->GetCurHp() << ")\n공격하시겠습니까? <y/n> : ";
+
                     char inputTarget;
-                    while(true){
-                        if(std::cin>>inputTarget){
-                            if(inputTarget=='n'){
-                                continue;
-                            }
-                            targets.push_back(unit);
-                            actionInfo.targets.push_back(unit);
+                    std::cin >> inputTarget;
+                
+                    if (inputTarget == 'y' || inputTarget == 'Y') {
+                        actionInfo.targets.push_back(targetCandidate);
+                        targetSelected = true;
+                        break; // 타깃을 선택했으므로 for문 탈출
+                    }
+                }
+            
+                // 타깃을 선택하지 못했거나 모두 n을 눌렀다면 기본적으로 첫 번째 적 선택
+                if (!targetSelected) {
+                    for (Unit* targetCandidate : units) {
+                        if (dynamic_cast<Player*>(targetCandidate) == nullptr && !targetCandidate->GetIsDead()) {
+                            actionInfo.targets.push_back(targetCandidate);
                             break;
                         }
                     }
-                    if(actionInfo.targets.size()>=2){
-                        break;
-                    }
-                    }
                 }
-                ActionResult actionResult=Action::ExcuteAction(actionInfo);
+            
+                // 공격 실행
+                ActionResult actionResult = Action::ExcuteAction(actionInfo);
                 std::cout<<actionResult.executor->GetName()<<"의 공격!!"<<std::endl;
                 for(DamageResult damaged:actionResult.resultDamaged){
                     std::cout<<damaged.target->GetName()<<"은(는) "<<damaged.damage<<"의 데미지를 입었다!\nCur Hp : "<<damaged.target->GetCurHp()<<std::endl;
@@ -86,20 +95,35 @@ void Battle::FlowCount(const std::vector<Unit*> units){
         }
     }
 } //각 유닛의 moveCount관리
-bool Battle::CheckEnd(){
-    for(Unit* unit : this->units){
-        if(typeid(unit)==typeid(Player)){
-            if(unit->GetIsDead()==true){
-            return true;
-            }
-        }else{
-            if(unit->GetIsDead()==false){
-            return false;
+bool Battle::CheckEnd() {
+    bool isPlayerAlive = false;
+    bool isEnemyAlive = false;
+
+    for (Unit* unit : this->units) {
+        if (!unit->GetIsDead()) { // 살아있는 유닛 확인
+            if (dynamic_cast<Player*>(unit) != nullptr) {
+                isPlayerAlive = true;
+            } else if (dynamic_cast<Enemy*>(unit) != nullptr) {
+                isEnemyAlive = true;
             }
         }
-        return true;
     }
-} //게임 승패 조건이 참인지 검사
+
+    // 플레이어가 죽었거나, 적이 전멸했으면 전투 종료(true)
+    if (!isPlayerAlive || !isEnemyAlive) {
+        return true; 
+    }
+
+    return false; // 전투 계속 진행
+}
+void Battle::OpenBattle() {
+    // 전투가 종료되지 않은 동안(!CheckEnd) 계속 턴을 돌린다.
+    while (!this->CheckEnd()) {
+        this->FlowCount(this->units);
+    }
+    this->CloseBattle();
+}
+Battle::Battle()=default;
 bool Battle::CloseBattle(){
     for(Unit* unit:this->units){
         if(typeid(unit)==typeid(Player)){
@@ -112,11 +136,5 @@ bool Battle::CloseBattle(){
             }
         }
     }
+    return true;
 } //게임 종료
-Battle::Battle()=default;
-void Battle::OpenBattle(){
-    while(this->CheckEnd()){
-        this->FlowCount(this->units);
-    }
-    this->CloseBattle();
-}; //게임 시작 이후 실행되는 로직 관리 <Battle의 몸체>
